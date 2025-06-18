@@ -22,7 +22,7 @@ from anthropic.types.beta import (
     BetaToolResultBlockParam,
 )
 
-from tools import BashTool, ComputerTool, EditTool, ToolCollection, ToolResult
+from tools import BashTool, ComputerTool, EditTool, OrcaSheetsTool, ToolCollection, ToolResult
 
 BETA_FLAG = "computer-use-2024-10-22"
 
@@ -40,25 +40,7 @@ PROVIDER_TO_DEFAULT_MODEL_NAME: dict[APIProvider, str] = {
 }
 
 
-# This system prompt is optimized for the Docker environment in this repository and
-# specific tool combinations enabled.
-# We encourage modifying this system prompt to ensure the model has context for the
-# environment it is running in, and to provide any additional information that may be
-# helpful for the task at hand.
-# SYSTEM_PROMPT = f"""<SYSTEM_CAPABILITY>
-# * You are utilizing a macOS Sonoma 15.7 environment using {platform.machine()} architecture with internet access.
-# * You can install applications using homebrew with your bash tool. Use curl instead of wget.
-# * To open Chrome, please just click on the Chrome icon in the Dock or use Spotlight.
-# * Using bash tool you can start GUI applications. GUI apps can be launched directly or with `open -a "Application Name"`. GUI apps will appear natively within macOS, but they may take some time to appear. Take a screenshot to confirm it did.
-# * When using your bash tool with commands that are expected to output very large quantities of text, redirect into a tmp file and use str_replace_editor or `grep -n -B <lines before> -A <lines after> <query> <filename>` to confirm output.
-# * When viewing a page it can be helpful to zoom out so that you can see everything on the page. In Chrome, use Command + "-" to zoom out or Command + "+" to zoom in.
-# * When using your computer function calls, they take a while to run and send back to you. Where possible/feasible, try to chain multiple of these calls all into one function calls request.
-# * The current date is {datetime.today().strftime('%A, %B %-d, %Y')}.
-# </SYSTEM_CAPABILITY>
-# <IMPORTANT>
-# * When using Chrome, if any first-time setup dialogs appear, IGNORE THEM. Instead, click directly in the address bar and enter the appropriate search term or URL there.
-# * If the item you are looking at is a pdf, if after taking a single screenshot of the pdf it seems that you want to read the entire document instead of trying to continue to read the pdf from your screenshots + navigation, determine the URL, use curl to download the pdf, install and use pdftotext (available via homebrew) to convert it to a text file, and then read that text file directly with your StrReplaceEditTool.
-# </IMPORTANT>"""
+# Enhanced system prompt with OrcaSheets awareness
 SYSTEM_PROMPT = f"""<SYSTEM_CAPABILITY>
 * You are utilizing a macOS Sonoma 15.7 environment using {platform.machine()} architecture with command line internet access.
 * Package management:
@@ -85,6 +67,12 @@ SYSTEM_PROMPT = f"""<SYSTEM_CAPABILITY>
   - Docker for containerization
   - Common build tools (make, cmake, etc.)
 
+* OrcaSheets automation:
+  - Dedicated OrcaSheets tool for spreadsheet operations
+  - Can open projects, upload/download files, create sheets
+  - Handles CSV, Excel, and other data formats
+  - For OrcaSheets tasks, use the orcasheets tool instead of computer tool
+
 * Output handling:
   - For large output, redirect to tmp files: command > /tmp/output.txt
   - Use grep with context: grep -n -B <before> -A <after> <query> <filename>
@@ -93,7 +81,84 @@ SYSTEM_PROMPT = f"""<SYSTEM_CAPABILITY>
 * Note: Command line function calls may have latency. Chain multiple operations into single requests where feasible.
 
 * The current date is {datetime.today().strftime('%A, %B %-d, %Y')}.
-</SYSTEM_CAPABILITY>"""
+</SYSTEM_CAPABILITY>
+
+<IMPORTANT>
+* When users mention OrcaSheets, spreadsheets, CSV uploads, or Excel files in the context of OrcaSheets, prioritize using the orcasheets tool.
+* The orcasheets tool provides specialized automation for:
+  - Opening OrcaSheets application and projects
+  - Uploading files (CSV, Excel, etc.) to OrcaSheets
+  - Creating new sheets and workbooks
+  - Downloading data from OrcaSheets
+  - Analyzing spreadsheet data
+
+* For general computer automation tasks not related to OrcaSheets, continue using the computer tool.
+* When in doubt about whether to use orcasheets or computer tool, analyze the user's intent:
+  - If they mention "OrcaSheets", "upload to spreadsheet", "open spreadsheet app", use orcasheets tool
+  - For general GUI automation, file management, or browser tasks, use computer tool
+</IMPORTANT>"""
+
+
+def parse_user_command_for_orcasheets(user_message: str) -> dict[str, Any] | None:
+    """
+    Parse user command to extract OrcaSheets-specific parameters.
+    Returns a dict with action and parameters if it's an OrcaSheets command, None otherwise.
+    """
+    message_lower = user_message.lower()
+    
+    # Check if this is an OrcaSheets command
+    if not OrcaSheetsTool.is_orcasheets_command(user_message):
+        return None
+    
+    result = {}
+    
+    # Determine action
+    if 'upload' in message_lower:
+        result['action'] = 'upload'
+    elif 'open' in message_lower:
+        result['action'] = 'open'
+    elif 'create' in message_lower and ('sheet' in message_lower or 'new' in message_lower):
+        result['action'] = 'create_sheet'
+    elif 'download' in message_lower:
+        result['action'] = 'download'
+    else:
+        result['action'] = 'open'  # Default action
+    
+    # Extract file path
+    import re
+    
+    # Look for file patterns
+    file_patterns = [
+        r'(\w+\.\w+)',  # filename.ext
+        r'from (\w+)',  # "from downloads"
+        r'upload (.+?)(?:\s|$)',  # "upload filename"
+    ]
+    
+    for pattern in file_patterns:
+        match = re.search(pattern, message_lower)
+        if match:
+            potential_file = match.group(1)
+            # Handle common path references
+            if potential_file == 'downloads':
+                continue
+            if '.' in potential_file:  # Likely a filename
+                result['file_path'] = potential_file
+                break
+    
+    # Extract project name (if mentioned)
+    project_patterns = [
+        r'project (\w+)',
+        r'in (\w+) project',
+    ]
+    
+    for pattern in project_patterns:
+        match = re.search(pattern, message_lower)
+        if match:
+            result['project_name'] = match.group(1)
+            break
+    
+    return result
+
 
 async def sampling_loop(
     *,
@@ -115,6 +180,7 @@ async def sampling_loop(
         ComputerTool(),
         BashTool(),
         EditTool(),
+        OrcaSheetsTool(),  # Add OrcaSheets tool
     )
     system = (
         f"{SYSTEM_PROMPT}{' ' + system_prompt_suffix if system_prompt_suffix else ''}"
@@ -124,6 +190,25 @@ async def sampling_loop(
         if only_n_most_recent_images:
             _maybe_filter_to_n_most_recent_images(messages, only_n_most_recent_images)
 
+        # Check if the last user message is an OrcaSheets command
+        # and inject a helpful system message to guide the model
+        if messages and messages[-1].get("role") == "user":
+            last_message_content = messages[-1].get("content", "")
+            if isinstance(last_message_content, list) and last_message_content:
+                # Extract text from the message
+                text_content = ""
+                for block in last_message_content:
+                    if isinstance(block, dict) and block.get("type") == "text":
+                        text_content += block.get("text", "")
+                    elif hasattr(block, 'text'):
+                        text_content += block.text
+                
+                # Parse for OrcaSheets commands
+                orcasheets_params = parse_user_command_for_orcasheets(text_content)
+                if orcasheets_params:
+                    # Add a system guidance message
+                    system += f"\n\nDETECTED ORCASHEETS TASK: The user wants to perform an OrcaSheets operation. Use the orcasheets tool with these suggested parameters: {orcasheets_params}"
+
         if provider == APIProvider.ANTHROPIC:
             client = Anthropic(api_key=api_key)
         elif provider == APIProvider.VERTEX:
@@ -132,9 +217,6 @@ async def sampling_loop(
             client = AnthropicBedrock()
 
         # Call the API
-        # we use raw_response to provide debug information to streamlit. Your
-        # implementation may be able call the SDK directly with:
-        # `response = client.messages.create(...)` instead.
         raw_response = client.beta.messages.with_raw_response.create(
             max_tokens=max_tokens,
             messages=messages,
