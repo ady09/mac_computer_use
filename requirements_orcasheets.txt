@@ -1,0 +1,15 @@
+# OrcaSheets Computer Use Framework Requirements
+
+# Core dependencies
+anthropic>=0.40.0              # Anthropic Claude API
+streamlit>=1.28.0              # Web interface
+python-dotenv>=1.0.0           # Environment variable loading
+
+# Optional dependencies for enhanced functionality
+Pillow>=9.0.0                  # Image processing for screenshots
+requests>=2.28.0               # HTTP requests
+
+# Development dependencies (optional)
+pytest>=7.0.0                  # Testing framework
+black>=22.0.0                  # Code formatting
+isort>=5.10.0                  # Import sorting
