@@ -1,0 +1,23 @@
+# OrcaSheets Automation Framework Requirements
+
+# Computer vision and image processing
+opencv-python>=4.8.0
+Pillow>=10.0.0
+numpy>=1.24.0
+
+# Already included in main project (from computer.py dependencies)
+# pyautogui - for mouse/keyboard control
+# keyboard - for keyboard shortcuts
+
+# AppleScript execution (built into macOS)
+# No additional requirements needed for AppleScript
+
+# Async support
+# asyncio - built into Python 3.7+
+
+# Optional: OCR capabilities (for future text recognition)
+# pytesseract>=0.3.10
+# tesseract-ocr (system package, install with: brew install tesseract)
+
+# Optional: More advanced computer vision
+# scikit-image>=0.21.0

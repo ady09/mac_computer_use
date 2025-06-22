@@ -22,7 +22,7 @@ from anthropic.types.beta import (
     BetaToolResultBlockParam,
 )
 
-from tools import BashTool, ComputerTool, EditTool, ToolCollection, ToolResult
+from tools import BashTool, ComputerTool, EditTool, OrcaSheetsTool, ToolCollection, ToolResult
 
 BETA_FLAG = "computer-use-2024-10-22"
 
@@ -92,6 +92,13 @@ SYSTEM_PROMPT = f"""<SYSTEM_CAPABILITY>
 
 * Note: Command line function calls may have latency. Chain multiple operations into single requests where feasible.
 
+* OrcaSheets automation:
+  - You have access to a specialized OrcaSheets tool for automating the OrcaSheets application
+  - Can open OrcaSheets, select projects, and upload files automatically
+  - Use the orcasheets tool with actions like 'full_workflow', 'open_app', 'select_project', 'upload_file'
+  - Supports file paths like '~/Downloads/filename.csv' and project names
+  - Example: orcasheets(action="full_workflow", file_path="~/Downloads/industry.csv", project_name="default")
+
 * The current date is {datetime.today().strftime('%A, %B %-d, %Y')}.
 </SYSTEM_CAPABILITY>"""
 
@@ -115,6 +122,7 @@ async def sampling_loop(
         ComputerTool(),
         BashTool(),
         EditTool(),
+        OrcaSheetsTool(),
     )
     system = (
         f"{SYSTEM_PROMPT}{' ' + system_prompt_suffix if system_prompt_suffix else ''}"
