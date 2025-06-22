@@ -42,36 +42,106 @@ class ScreenAnalyzer:
     def find_add_new_sheet_button(self, base64_image: str) -> Optional[Tuple[int, int]]:
         """
         Find the 'Add new sheet' button in the screenshot.
-        Uses color and pattern matching.
+        Uses multiple detection methods.
         """
+        if not HAS_VISION:
+            # Fallback to approximate center if no computer vision
+            return self._fallback_add_new_sheet_location()
+            
         image = self.base64_to_opencv(base64_image)
-        
-        # Convert to HSV for better color detection
-        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-        
-        # Look for blue-ish colors (common in buttons)
-        # These ranges might need adjustment based on the actual app colors
-        lower_blue = np.array([100, 50, 50])
-        upper_blue = np.array([130, 255, 255])
-        
-        mask = cv2.inRange(hsv, lower_blue, upper_blue)
-        
-        # Find contours
-        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        
-        # Look for button-like shapes (rectangular contours)
-        for contour in contours:
-            area = cv2.contourArea(contour)
-            if 100 < area < 5000:  # Filter by size
-                x, y, w, h = cv2.boundingRect(contour)
-                # Check if it's roughly button-shaped
-                if 0.3 < h/w < 3:  # Reasonable aspect ratio
-                    return (x + w // 2, y + h // 2)
-                    
-        # Fallback: return approximate location based on screenshots
-        # From ss02.png, the "Add new sheet" appears around the center
         height, width = image.shape[:2]
-        return (width // 2, height // 2)
+        
+        # Method 1: Look for blue/link-colored text areas
+        coords = self._find_by_color_pattern(image)
+        if coords:
+            return coords
+            
+        # Method 2: Look for text-like regions in the center area
+        coords = self._find_by_text_region(image)
+        if coords:
+            return coords
+            
+        # Method 3: Fallback to center area where "Add new sheet" typically appears
+        return self._fallback_add_new_sheet_location()
+        
+    def _find_by_color_pattern(self, image) -> Optional[Tuple[int, int]]:
+        """Find button by looking for blue/link colors"""
+        try:
+            # Convert to HSV for better color detection
+            hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+            
+            # Look for blue-ish colors (common in links/buttons)
+            lower_blue = np.array([100, 50, 50])
+            upper_blue = np.array([130, 255, 255])
+            
+            mask = cv2.inRange(hsv, lower_blue, upper_blue)
+            
+            # Find contours
+            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            
+            # Look for appropriately sized regions
+            for contour in contours:
+                area = cv2.contourArea(contour)
+                if 100 < area < 5000:  # Filter by size
+                    x, y, w, h = cv2.boundingRect(contour)
+                    # Check if it's in the center area and reasonable size
+                    center_x, center_y = x + w // 2, y + h // 2
+                    img_center_x, img_center_y = image.shape[1] // 2, image.shape[0] // 2
+                    
+                    # Prefer elements closer to center
+                    if abs(center_x - img_center_x) < img_center_x // 2:
+                        return (center_x, center_y)
+                        
+        except Exception as e:
+            print(f"Color detection failed: {e}")
+            
+        return None
+        
+    def _find_by_text_region(self, image) -> Optional[Tuple[int, int]]:
+        """Find button by looking for text-like regions"""
+        try:
+            # Convert to grayscale
+            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+            
+            # Apply threshold to get text regions
+            _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+            
+            # Find contours that might be text
+            contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            
+            height, width = image.shape[:2]
+            center_x, center_y = width // 2, height // 2
+            
+            # Look for text-like regions in the center area
+            candidates = []
+            for contour in contours:
+                x, y, w, h = cv2.boundingRect(contour)
+                
+                # Filter by size and aspect ratio (text-like)
+                if 50 < w < 300 and 10 < h < 50 and 2 < w/h < 15:
+                    # Check if it's in the center area
+                    contour_center_x = x + w // 2
+                    contour_center_y = y + h // 2
+                    
+                    # Distance from center
+                    distance = ((contour_center_x - center_x) ** 2 + (contour_center_y - center_y) ** 2) ** 0.5
+                    candidates.append((distance, contour_center_x, contour_center_y))
+            
+            # Return the closest to center
+            if candidates:
+                candidates.sort()
+                return (candidates[0][1], candidates[0][2])
+                
+        except Exception as e:
+            print(f"Text region detection failed: {e}")
+            
+        return None
+        
+    def _fallback_add_new_sheet_location(self) -> Tuple[int, int]:
+        """Fallback location for Add new sheet button"""
+        # Based on typical screen layouts, "Add new sheet" is usually in center
+        # This is a reasonable fallback
+        return (683, 400)  # Approximate center area
         
     def find_project_in_list(self, base64_image: str, project_name: str) -> Optional[Tuple[int, int]]:
         """

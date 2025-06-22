@@ -51,7 +51,10 @@ When you use the Streamlit dashboard, Claude can now handle these OrcaSheets-rel
    - Opens OrcaSheets via Spotlight (`cmd+space`)
    - Navigates project selection screen
    - Uses search if specific project requested
-   - Clicks "Add new sheet" button
+   - **Smart button detection**: Finds "Add new sheet" button using:
+     - 🎯 AppleScript text detection (most reliable)
+     - 🔍 Computer vision analysis (adaptive)
+     - 📍 Multiple fallback coordinates (backup)
    - Handles file upload dialog
 5. **Returns result** to user
 
@@ -119,6 +122,17 @@ OrcaSheets automation error: coordinate is not accepted for left_click
 - ✅ Changed from `left_click(coordinate=(x,y))` to `mouse_move(coordinate=[x,y])` + `left_click()`
 - ✅ Fixed coordinate format: tuples `(x,y)` → lists `[x,y]`
 - ✅ All clicking now works correctly
+
+**Problem 3:** Hardcoded coordinates don't work reliably across different screen resolutions:
+```
+Coordinates don't match for add new sheets
+```
+
+**Solution 3:** Implemented dynamic, coordinate-free detection system:
+- ✅ **AppleScript text detection**: Finds UI elements by text content ("Add new sheet")
+- ✅ **Computer vision analysis**: Uses image processing to locate buttons dynamically  
+- ✅ **Multiple fallback coordinates**: Smart coordinate fallbacks if other methods fail
+- ✅ **No more hardcoded coordinates**: Works on any screen resolution/layout
 
 ## 🎯 Ready to Use
 

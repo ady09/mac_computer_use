@@ -183,6 +183,80 @@ class AppleScriptHelper:
         return success
     
     @staticmethod
+    async def find_and_click_text(app_name: str, text: str, window_name: str = "1") -> bool:
+        """Find and click text or UI element containing specific text"""
+        script = f'''
+        tell application "System Events"
+            tell process "{app_name}"
+                tell window {window_name}
+                    -- Try to find static text first
+                    try
+                        click (first static text whose value contains "{text}")
+                        return true
+                    on error
+                        -- Try to find button with text
+                        try
+                            click (first button whose title contains "{text}")
+                            return true
+                        on error
+                            -- Try to find any UI element with text
+                            try
+                                click (first UI element whose description contains "{text}")
+                                return true
+                            on error
+                                return false
+                            end try
+                        end try
+                    end try
+                end tell
+            end tell
+        end tell
+        '''
+        success, output = await AppleScriptHelper.run_applescript(script)
+        return success and output.lower() == 'true'
+    
+    @staticmethod 
+    async def get_clickable_elements(app_name: str, window_name: str = "1") -> List[str]:
+        """Get list of clickable elements in the window"""
+        script = f'''
+        tell application "System Events"
+            tell process "{app_name}"
+                tell window {window_name}
+                    set elementList to {{}}
+                    
+                    -- Get buttons
+                    repeat with btn in buttons
+                        try
+                            set end of elementList to "button: " & (title of btn)
+                        end try
+                    end repeat
+                    
+                    -- Get static text (potentially clickable links)
+                    repeat with txt in static texts
+                        try
+                            if (value of txt) is not "" then
+                                set end of elementList to "text: " & (value of txt)
+                            end if
+                        end try
+                    end repeat
+                    
+                    return elementList
+                end tell
+            end tell
+        end tell
+        '''
+        success, output = await AppleScriptHelper.run_applescript(script)
+        if success and output:
+            # Parse the AppleScript list format
+            elements = []
+            for line in output.split(','):
+                line = line.strip()
+                if line:
+                    elements.append(line)
+            return elements
+        return []
+    
+    @staticmethod
     async def select_file_in_dialog(file_path: str) -> bool:
         """Select a file in an open file dialog"""
         script = f'''

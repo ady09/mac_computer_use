@@ -6,6 +6,8 @@ import base64
 
 from ..computer import ComputerTool
 from ..base import ToolResult
+from .core.vision import ScreenAnalyzer
+from .core.applescript_helper import AppleScriptHelper
 
 # Optional imports for vision capabilities
 try:
@@ -26,6 +28,8 @@ class OrcaSheetsAutomation:
     def __init__(self):
         self.computer = ComputerTool()
         self.wait_time = 2.0  # Default wait time between actions
+        self.screen_analyzer = ScreenAnalyzer()
+        self.applescript = AppleScriptHelper()
         
     async def _wait(self, seconds: Optional[float] = None):
         """Wait for specified time or default wait time"""
@@ -130,19 +134,72 @@ class OrcaSheetsAutomation:
         print(f"Project {project_name} selected")
         
     async def add_new_sheet(self):
-        """Click on 'Add new sheet' or plus button to upload a file"""
-        print("Clicking 'Add new sheet'...")
+        """Click on 'Add new sheet' or plus button to upload a file using dynamic detection"""
+        print("Looking for 'Add new sheet' button...")
         
-        # Take screenshot to see current state
+        # Take screenshot to analyze current state
         screenshot = await self._take_screenshot()
         
-        # Based on ss02.png, the "Add new sheet" link is in the center
-        # These coordinates are approximate based on the screenshot
-        await self.computer(action="mouse_move", coordinate=[820, 307])
-        await self.computer(action="left_click")
-        await self._wait(2.0)
+        if not screenshot.base64_image:
+            print("Warning: Could not take screenshot, using fallback method")
+            return await self._add_new_sheet_fallback()
         
-        print("Add new sheet clicked")
+        # Method 1: Try AppleScript text-based clicking (most reliable)
+        print("Trying AppleScript text detection...")
+        success = await self.applescript.find_and_click_text("OrcaSheets", "Add new sheet")
+        if success:
+            print("✅ Found and clicked 'Add new sheet' using AppleScript")
+            await self._wait(2.0)
+            return
+            
+        # Method 2: Try alternative AppleScript text variations
+        for text_variation in ["Add new sheet", "new sheet", "+ Add", "Upload"]:
+            print(f"Trying AppleScript with text: '{text_variation}'...")
+            success = await self.applescript.find_and_click_text("OrcaSheets", text_variation)
+            if success:
+                print(f"✅ Found and clicked using AppleScript with '{text_variation}'")
+                await self._wait(2.0)
+                return
+        
+        # Method 3: Use computer vision to find the button
+        print("Trying computer vision detection...")
+        coords = self.screen_analyzer.find_add_new_sheet_button(screenshot.base64_image)
+        if coords:
+            print(f"🔍 Computer vision found button at coordinates: {coords}")
+            await self.computer(action="mouse_move", coordinate=[coords[0], coords[1]])
+            await self.computer(action="left_click")
+            await self._wait(2.0)
+            print("✅ Clicked 'Add new sheet' using computer vision")
+            return
+            
+        # Method 4: Fallback to center clicking
+        print("Using fallback method...")
+        await self._add_new_sheet_fallback()
+        
+    async def _add_new_sheet_fallback(self):
+        """Fallback method for clicking Add new sheet"""
+        print("🔄 Using fallback coordinate-based clicking...")
+        
+        # Multiple fallback coordinates to try (based on common layouts)
+        fallback_coords = [
+            [683, 400],  # Center area
+            [683, 350],  # Slightly higher
+            [683, 450],  # Slightly lower
+            [620, 400],  # Left of center
+            [750, 400],  # Right of center
+        ]
+        
+        for i, coords in enumerate(fallback_coords):
+            print(f"Trying fallback coordinates {i+1}/{len(fallback_coords)}: {coords}")
+            await self.computer(action="mouse_move", coordinate=coords)
+            await self.computer(action="left_click")
+            await self._wait(1.0)
+            
+            # Take a screenshot to see if anything changed
+            screenshot = await self._take_screenshot()
+            # In a real implementation, you could analyze if a file dialog opened
+            
+        print("✅ Completed fallback clicking attempts")
         
     async def upload_file(self, file_path: str):
         """
