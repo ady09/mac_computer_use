@@ -11,6 +11,7 @@ from enum import StrEnum
 from functools import partial
 from pathlib import PosixPath
 from typing import cast
+import re
 
 import streamlit as st
 from anthropic import APIResponse
@@ -28,6 +29,7 @@ from loop import (
 )
 from tools import ToolResult
 from dotenv import load_dotenv
+from tools.orcasheets.tool import OrcaSheetsTool
 
 load_dotenv()
 
@@ -201,6 +203,33 @@ async def main():
                 }
             )
             _render_message(Sender.USER, new_message)
+
+            # --- OrcaSheets integration ---
+            prompt_lower = new_message.lower()
+            if "orcasheets" in prompt_lower and "upload" in prompt_lower:
+                # Extract file path (e.g., 'industry.csv from downloads')
+                file_match = re.search(r"upload ([\w\-.]+) from ([\w\-/~]+)", prompt_lower)
+                if file_match:
+                    file_name = file_match.group(1)
+                    folder = file_match.group(2)
+                    file_path = f"~/{folder}/{file_name}" if not folder.startswith("/") else f"{folder}/{file_name}"
+                else:
+                    # fallback: look for .csv in prompt
+                    file_match = re.search(r"(\w+\.csv)", prompt_lower)
+                    file_path = f"~/Downloads/{file_match.group(1)}" if file_match else None
+                # Extract project name if present
+                project_match = re.search(r"select ([\w\- ]+) project", prompt_lower)
+                project_name = project_match.group(1).strip() if project_match else None
+                with st.spinner("Running OrcaSheets automation..."):
+                    orcasheets_tool = OrcaSheetsTool()
+                    result = await orcasheets_tool.run_workflow(new_message, file_path, project_name)
+                st.session_state.messages.append({
+                    "role": Sender.TOOL,
+                    "content": f"OrcaSheets automation result: {result}",
+                })
+                _render_message(Sender.TOOL, f"OrcaSheets automation result: {result}")
+                return
+            # --- End OrcaSheets integration ---
 
         try:
             most_recent_message = st.session_state["messages"][-1]
