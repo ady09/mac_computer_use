@@ -38,11 +38,17 @@ class OrcaSheetsTool:
         prompt_lower = prompt.lower()
         
         # Check if user wants to upload to existing project
-        if project_name and project_name.lower() != "default" and ("select" in prompt_lower or "search" in prompt_lower):
+        if project_name and ("select" in prompt_lower):
             # Workflow 1: open, search/select existing project, upload to existing project  
             await self.run_task("open_orcasheets")
-            await self.run_task("select_project", project_name=project_name)
-            return await self.run_task("upload_file", file_path=file_path, project_name=project_name)
+            select_result = await self.run_task("select_project", project_name=project_name)
+            
+            # Check if project selection was successful
+            if select_result.get("status") == "project_selected":
+                return await self.run_task("upload_file", file_path=file_path, project_name=project_name)
+            else:
+                # Project selection failed, return the error
+                return select_result
         else:
             # Workflow 2: open, create new project via upload (default behavior)
             await self.run_task("open_orcasheets")
