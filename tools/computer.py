@@ -200,7 +200,6 @@ class ComputerTool(BaseAnthropicTool):
                     "cliclick p",
                     take_screenshot=False,
                 )
-                import pdb; pdb.set_trace()
                 if result.output:
                     x, y = map(int, result.output.strip().split(","))
                     x, y = self.scale_coordinates(ScalingSource.COMPUTER, x, y)
