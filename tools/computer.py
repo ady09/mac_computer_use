@@ -142,11 +142,19 @@ class ComputerTool(BaseAnthropicTool):
                     "Up": "up",
                     "Down": "down",
                     "Escape": "esc",
-                    "command": "command",
-                    "cmd": "command",
+                    "command": "cmd",
+                    "cmd": "cmd",
                     "alt": "alt",
                     "shift": "shift",
-                    "ctrl": "ctrl"
+                    "ctrl": "ctrl",
+                    # Add letter mappings
+                    "g": "g",
+                    "c": "c",
+                    "v": "v",
+                    "x": "x",
+                    "z": "z",
+                    "s": "s",
+                    "a": "a"
                 }
 
                 try:
@@ -154,6 +162,7 @@ class ComputerTool(BaseAnthropicTool):
                         # Handle combinations like "ctrl+c"
                         keys = text.split("+")
                         mapped_keys = [key_map.get(k.strip(), k.strip()) for k in keys]
+                        print(f"[KEY] Key combination: {text} -> {mapped_keys}")
                         await asyncio.get_event_loop().run_in_executor(
                             None, keyboard.press_and_release, '+'.join(mapped_keys)
                         )
