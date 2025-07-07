@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Debug test runner with verbose output
+Debug test runner with verbose output using modular components
 """
 
 import asyncio
@@ -11,16 +11,16 @@ from pathlib import Path
 # Add current directory to path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from tools.test_runner import TestRunner
+from tools.test_runner_modular import ModularTestRunner
 
 
-class DebugTestRunner(TestRunner):
-    """Test runner with enhanced debugging"""
+class DebugModularTestRunner(ModularTestRunner):
+    """Test runner with enhanced debugging using modular components"""
     
     async def run_test(self, test_file_path: str):
         """Run test with detailed debugging output"""
         print("="*80)
-        print(f"🐛 DEBUG MODE: Running test {test_file_path}")
+        print(f"🐛 DEBUG MODE: Running modular test {test_file_path}")
         print("="*80)
         
         result = await super().run_test(test_file_path)
@@ -36,7 +36,7 @@ class DebugTestRunner(TestRunner):
         if result.error_message:
             print(f"❌ Error: {result.error_message}")
         
-        print("\n📝 Step-by-step breakdown:")
+        print("\\n📝 Step-by-step breakdown:")
         for i, step in enumerate(result.step_results, 1):
             status_emoji = "✅" if step.status == "passed" else "❌"
             print(f"{status_emoji} Step {i}: {step.step_name}")
@@ -53,21 +53,21 @@ class DebugTestRunner(TestRunner):
 
 
 async def run_orcasheets_debug():
-    """Run OrcaSheets file upload test with debug output"""
+    """Run OrcaSheets search projects test with debug output using modular runner"""
     
     # Initialize debug test runner
     script_dir = Path(__file__).parent
     tests_dir = script_dir.parent / "tests"
-    runner = DebugTestRunner(str(tests_dir))
+    runner = DebugModularTestRunner(str(tests_dir))
     
     # Test file path
-    test_file = tests_dir / "projects" / "orcasheets" / "file_upload.json"
+    test_file = tests_dir / "projects" / "orcasheets" / "search_projects.json"
     
     if not test_file.exists():
         print(f"❌ Test file not found: {test_file}")
         return False
     
-    print(f"🚀 Running OrcaSheets file upload test with debugging...")
+    print(f"🚀 Running OrcaSheets search projects test with modular debugging...")
     print(f"📁 Test file: {test_file}")
     
     try:
@@ -76,7 +76,7 @@ async def run_orcasheets_debug():
         
         # Generate report
         report_path = runner.generate_report([result])
-        print(f"\n📄 Report generated: {report_path}")
+        print(f"\\n📄 Report generated: {report_path}")
         
         # Try to open report
         if sys.platform == "darwin":
@@ -92,8 +92,8 @@ async def run_orcasheets_debug():
 
 
 def main():
-    print("🐛 OrcaSheets Debug Test Runner")
-    print("This will run the file upload test with detailed debugging output")
+    print("🐛 OrcaSheets Modular Debug Test Runner")
+    print("This will run the search projects test with detailed debugging output using modular components")
     print()
     
     success = asyncio.run(run_orcasheets_debug())
