@@ -49,13 +49,8 @@ class ClickHandler(BaseActionHandler):
                 # Add small delay before clicking
                 await asyncio.sleep(0.5)
                 
-                # Move mouse to the coordinate first, then click
-                print(f"[FIND_CLICK] Moving mouse to {found_coordinate}")
-                await self.computer_tool(action='mouse_move', coordinate=found_coordinate)
-                await asyncio.sleep(0.2)  # Small delay for mouse movement
-                
-                print(f"[FIND_CLICK] Clicking at {found_coordinate}")
-                click_result = await self.computer_tool(action='left_click')
+                print(f"[FIND_CLICK] Clicking directly at {found_coordinate}")
+                click_result = await self.computer_tool(action='left_click', coordinate=found_coordinate)
                 
                 # Add small delay after clicking
                 await asyncio.sleep(1)

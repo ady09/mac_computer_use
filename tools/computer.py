@@ -199,7 +199,9 @@ class ComputerTool(BaseAnthropicTool):
         ):
             if text is not None:
                 raise ToolError(f"text is not accepted for {action}")
-            if coordinate is not None:
+            
+            # Allow coordinates for click actions
+            if coordinate is not None and action not in ("left_click", "right_click", "double_click", "middle_click"):
                 raise ToolError(f"coordinate is not accepted for {action}")
 
             if action == "screenshot":
@@ -215,12 +217,30 @@ class ComputerTool(BaseAnthropicTool):
                     return result.replace(output=f"X={x},Y={y}")
                 return result
             else:
-                click_cmd = {
-                    "left_click": "c:.",
-                    "right_click": "rc:.",
-                    "middle_click": "mc:.",
-                    "double_click": "dc:.",
-                }[action]
+                # Handle click actions with or without coordinates
+                if coordinate is not None:
+                    if not isinstance(coordinate, list) or len(coordinate) != 2:
+                        raise ToolError(f"{coordinate} must be a tuple of length 2")
+                    if not all(isinstance(i, int) and i >= 0 for i in coordinate):
+                        raise ToolError(f"{coordinate} must be a tuple of non-negative ints")
+                    
+                    x, y = self.scale_coordinates(ScalingSource.API, coordinate[0], coordinate[1])
+                    
+                    click_cmd = {
+                        "left_click": f"c:{x},{y}",
+                        "right_click": f"rc:{x},{y}",
+                        "middle_click": f"mc:{x},{y}",
+                        "double_click": f"dc:{x},{y}",
+                    }[action]
+                else:
+                    # Use current cursor position
+                    click_cmd = {
+                        "left_click": "c:.",
+                        "right_click": "rc:.",
+                        "middle_click": "mc:.",
+                        "double_click": "dc:.",
+                    }[action]
+                
                 return await self.shell(f"cliclick {click_cmd}")
 
         raise ToolError(f"Invalid action: {action}")

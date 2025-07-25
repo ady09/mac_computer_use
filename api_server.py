@@ -131,11 +131,16 @@ class TestAutomationAPI:
         results = []
         project_dir = Path(self.tests_base_dir) / "projects" / project
         
+        print(f"[API] Looking for tests in project directory: {project_dir}")
         if not project_dir.exists():
+            print(f"[API] Project directory does not exist: {project_dir}")
             raise FileNotFoundError(f"Project directory not found: {project_dir}")
         
         # Find all JSON test files in the project directory
-        for test_file in project_dir.glob("*.json"):
+        test_files = list(project_dir.glob("*.json"))
+        print(f"[API] Found {len(test_files)} test files: {[f.name for f in test_files]}")
+        
+        for test_file in test_files:
             try:
                 print(f"[API] Running test: {test_file}")
                 result = await self.runner.run_test(str(test_file))

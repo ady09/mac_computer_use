@@ -368,6 +368,9 @@ class ModularTestRunner:
         failed_tests = len([r for r in results if r.status == 'failed'])
         error_tests = len([r for r in results if r.status == 'error'])
         
+        # Calculate success rate safely to avoid division by zero
+        success_rate = f"{(passed_tests/total_tests*100):.1f}%" if total_tests > 0 else "N/A"
+        
         html = f"""
         <!DOCTYPE html>
         <html>
@@ -393,7 +396,7 @@ class ModularTestRunner:
                 <p>Passed: {passed_tests}</p>
                 <p>Failed: {failed_tests}</p>
                 <p>Errors: {error_tests}</p>
-                <p>Success Rate: {(passed_tests/total_tests*100):.1f}%</p>
+                <p>Success Rate: {success_rate}</p>
             </div>
         """
         
