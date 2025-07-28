@@ -3,7 +3,6 @@ import base64
 import os
 import shlex
 import pyautogui
-import keyboard
 from enum import StrEnum
 from pathlib import Path
 from typing import Literal, TypedDict
@@ -16,7 +15,7 @@ from .run import run
 
 OUTPUT_DIR = "/tmp/outputs"
 
-TYPING_DELAY_MS = 12
+TYPING_DELAY_MS = 8
 TYPING_GROUP_SIZE = 50
 
 Action = Literal[
@@ -76,7 +75,7 @@ class ComputerTool(BaseAnthropicTool):
     height: int
     display_num: int | None
 
-    _screenshot_delay = 1.0  # macOS is generally faster than X11
+    _screenshot_delay = 0.3  # Optimized delay for macOS
     _scaling_enabled = True
 
     @property
@@ -132,55 +131,68 @@ class ComputerTool(BaseAnthropicTool):
                 raise ToolError(output=f"{text} must be a string")
 
             if action == "key":
-                # Convert common key names to pyautogui format
-                key_map = {
-                    "Return": "enter",
-                    "space": "space",
-                    "Tab": "tab",
-                    "Left": "left",
-                    "Right": "right",
-                    "Up": "up",
-                    "Down": "down",
-                    "Escape": "esc",
-                    "command": "cmd",
-                    "cmd": "cmd",
-                    "alt": "alt",
-                    "shift": "shift",
-                    "ctrl": "ctrl",
-                    # Add letter mappings
-                    "g": "g",
-                    "c": "c",
-                    "v": "v",
-                    "x": "x",
-                    "z": "z",
-                    "s": "s",
-                    "a": "a"
-                }
-
                 try:
                     if "+" in text:
-                        # Handle combinations like "ctrl+c"
+                        # Handle key combinations using cliclick
                         keys = text.split("+")
-                        mapped_keys = []
-                        for k in keys:
-                            key = k.strip()
-                            # For single letters, just use the letter directly
-                            if len(key) == 1 and key.isalpha():
-                                mapped_keys.append(key.lower())
+                        modifiers = []
+                        regular_key = None
+                        
+                        # Separate modifiers from regular keys
+                        for key in keys:
+                            key = key.strip().lower()
+                            if key in ["cmd", "command"]:
+                                modifiers.append("cmd")
+                            elif key == "shift":
+                                modifiers.append("shift")
+                            elif key == "ctrl":
+                                modifiers.append("ctrl")
+                            elif key == "alt":
+                                modifiers.append("alt")
                             else:
-                                mapped_keys.append(key_map.get(key, key))
-                        print(f"[KEY] Key combination: {text} -> {mapped_keys}")
-                        await asyncio.get_event_loop().run_in_executor(
-                            None, keyboard.press_and_release, '+'.join(mapped_keys)
-                        )
+                                regular_key = key
+                        
+                        print(f"[KEY] Key combination: {text} -> modifiers: {modifiers}, key: {regular_key}")
+                        
+                        # Build cliclick command for key combinations
+                        if modifiers and regular_key:
+                            modifier_list = ",".join(modifiers)
+                            # For regular letters, use type command with modifiers
+                            if len(regular_key) == 1 and regular_key.isalpha():
+                                cmd = f"kd:{modifier_list} t:{regular_key} ku:{modifier_list}"
+                            else:
+                                # For special keys, use kp command
+                                special_key_map = {
+                                    "return": "enter",
+                                    "escape": "esc",
+                                    "tab": "tab",
+                                    "space": "space"
+                                }
+                                mapped_key = special_key_map.get(regular_key, regular_key)
+                                cmd = f"kd:{modifier_list} kp:{mapped_key} ku:{modifier_list}"
+                            return await self.shell(f"cliclick {cmd}")
+                        else:
+                            # Just single key
+                            if regular_key and len(regular_key) == 1 and regular_key.isalpha():
+                                return await self.shell(f"cliclick t:{regular_key}")
+                            else:
+                                return await self.shell(f"cliclick kp:{regular_key}")
                     else:
                         # Handle single keys
-                        mapped_key = key_map.get(text, text)
-                        await asyncio.get_event_loop().run_in_executor(
-                            None, keyboard.press_and_release, mapped_key
-                        )
-
-                    return ToolResult(output=f"Pressed key: {text}", error=None, base64_image=None)
+                        key = text.strip().lower()
+                        if len(key) == 1 and key.isalpha():
+                            # Use type command for letters
+                            return await self.shell(f"cliclick t:{key}")
+                        else:
+                            # Use key press for special keys
+                            special_key_map = {
+                                "return": "enter",
+                                "escape": "esc",
+                                "tab": "tab",
+                                "space": "space"
+                            }
+                            mapped_key = special_key_map.get(key, key)
+                            return await self.shell(f"cliclick kp:{mapped_key}")
 
                 except Exception as e:
                     return ToolResult(output=None, error=str(e), base64_image=None)

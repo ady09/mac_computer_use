@@ -149,8 +149,22 @@ class ModularTestRunner:
                         print(f"Step failed but continuing: {step_result.error_message}")
                         continue
                     elif step.on_failure == OnFailureAction.RETRY:
-                        print(f"Step failed, retry not implemented yet: {step_result.error_message}")
-                        break
+                        print(f"Step failed, attempting retry: {step_result.error_message}")
+                        # Take screenshot before retry
+                        retry_screenshot = await self.computer_tool(action='screenshot')
+                        print(f"[RETRY] Taking fallback screenshot, retrying step: {step.name}")
+                        
+                        # Retry the step once
+                        retry_result = await self._execute_step(step)
+                        if retry_result.status == 'passed':
+                            print(f"[RETRY] Step succeeded on retry: {step.name}")
+                            # Replace the failed result with the successful retry
+                            step_results[-1] = retry_result
+                            continue
+                        else:
+                            print(f"[RETRY] Step failed again after retry: {retry_result.error_message}")
+                            # Keep original failed result and stop
+                            break
                     else:  # STOP
                         print(f"Step failed, stopping test: {step_result.error_message}")
                         break
@@ -249,7 +263,7 @@ class ModularTestRunner:
             expectations_met = True
             if step.expected:
                 print(f"[TEST] Checking expected outcomes: {step.expected}")
-                expectations_met = await self._verify_expected(step.expected, result)
+                expectations_met = await self._verify_expected(step.expected, result, max_retries=1)
                 print(f"[TEST] Expectations met: {expectations_met}")
             
             if not expectations_met:
@@ -283,36 +297,76 @@ class ModularTestRunner:
                 error_message=str(e)
             )
 
-    async def _verify_expected(self, expected: Dict[str, Any], result: ToolResult) -> bool:
-        """Verify expected outcomes"""
+    async def _verify_expected(self, expected: Dict[str, Any], result: ToolResult, max_retries: int = 1) -> bool:
+        """Verify expected outcomes with retry logic"""
         try:
             for expectation, value in expected.items():
                 if expectation == "window_visible":
-                    # Verify window is visible
-                    verification_result = await self.verification_handler.execute_verify_window({"app": value})
+                    # Verify window is visible with retry
+                    verification_result = await self.verification_handler.execute_verify_window({
+                        "app": value, 
+                        "max_retries": max_retries, 
+                        "wait_time": 2
+                    })
                     if verification_result.error:
+                        print(f"[VERIFY] Window verification failed: {verification_result.error}")
                         return False
                         
                 elif expectation == "text_visible":
-                    # Verify text is visible on screen
-                    verification_result = await self.verification_handler.execute_verify_text({"text": value})
+                    # Verify text is visible on screen with retry
+                    verification_result = await self.verification_handler.execute_verify_text({
+                        "text": value, 
+                        "max_retries": max_retries, 
+                        "wait_time": 2
+                    })
                     if verification_result.error:
+                        print(f"[VERIFY] Text verification failed: {verification_result.error}")
                         return False
                         
                 elif expectation == "element_visible":
-                    # Verify element is visible
-                    verification_result = await self.verification_handler.execute_verify_element({"element": value})
+                    # Verify element is visible with retry
+                    verification_result = await self.verification_handler.execute_verify_element({
+                        "element": value, 
+                        "max_retries": max_retries, 
+                        "wait_time": 2
+                    })
                     if verification_result.error:
+                        print(f"[VERIFY] Element verification failed: {verification_result.error}")
                         return False
                         
                 elif expectation == "dialog_open":
-                    # Check if a dialog is open (simplified check)
-                    # This could be enhanced to check for specific dialog types
-                    return True  # Placeholder
+                    # Check if a dialog is open with text-based verification
+                    dialog_indicators = ["OK", "Cancel", "Yes", "No", "Close", "Save", "Don't Save"]
+                    found_dialog = False
+                    for indicator in dialog_indicators:
+                        verification_result = await self.verification_handler.execute_verify_text({
+                            "text": indicator, 
+                            "max_retries": max_retries, 
+                            "wait_time": 2
+                        })
+                        if not verification_result.error:
+                            found_dialog = True
+                            break
+                    if not found_dialog:
+                        print(f"[VERIFY] Dialog verification failed: No dialog indicators found")
+                        return False
                     
                 elif expectation == "upload_complete":
-                    # Check if upload completed (simplified check)
-                    return True  # Placeholder
+                    # Check for upload completion indicators
+                    upload_indicators = ["Upload complete", "Upload successful", "File uploaded", "100%", "Done"]
+                    found_completion = False
+                    for indicator in upload_indicators:
+                        verification_result = await self.verification_handler.execute_verify_text({
+                            "text": indicator, 
+                            "max_retries": max_retries, 
+                            "wait_time": 2
+                        })
+                        if not verification_result.error:
+                            found_completion = True
+                            break
+                    if not found_completion:
+                        print(f"[VERIFY] Upload completion verification failed: No completion indicators found")
+                        return False
                     
                 else:
                     print(f"[VERIFY] Unknown expectation type: {expectation}")

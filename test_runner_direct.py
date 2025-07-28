@@ -103,8 +103,8 @@ async def run_all_spotify_tests():
         success = await run_spotify_test(test_name)
         results.append((test_name, success))
         
-        # Wait between tests
-        await asyncio.sleep(2)
+        # Reduced wait between tests
+        await asyncio.sleep(0.5)
     
     # Summary
     print(f"\n📊 Overall Results:")
