@@ -47,7 +47,7 @@ class ClickHandler(BaseActionHandler):
                 print(f"[FIND_CLICK] ✅ Found target '{target}' at {found_coordinate}")
                 
                 # Add small delay before clicking
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(2)
                 
                 print(f"[FIND_CLICK] Clicking directly at {found_coordinate}")
                 click_result = await self.computer_tool(action='left_click', coordinate=found_coordinate)

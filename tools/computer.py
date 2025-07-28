@@ -161,7 +161,14 @@ class ComputerTool(BaseAnthropicTool):
                     if "+" in text:
                         # Handle combinations like "ctrl+c"
                         keys = text.split("+")
-                        mapped_keys = [key_map.get(k.strip(), k.strip()) for k in keys]
+                        mapped_keys = []
+                        for k in keys:
+                            key = k.strip()
+                            # For single letters, just use the letter directly
+                            if len(key) == 1 and key.isalpha():
+                                mapped_keys.append(key.lower())
+                            else:
+                                mapped_keys.append(key_map.get(key, key))
                         print(f"[KEY] Key combination: {text} -> {mapped_keys}")
                         await asyncio.get_event_loop().run_in_executor(
                             None, keyboard.press_and_release, '+'.join(mapped_keys)
