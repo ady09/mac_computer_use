@@ -13,9 +13,10 @@ from ..ui_detection import ElementFinder
 class ClickHandler(BaseActionHandler):
     """Handle computer click actions"""
     
-    def __init__(self, computer_tool, element_finder: ElementFinder = None):
+    def __init__(self, computer_tool, element_finder: ElementFinder = None, test_runner=None):
         super().__init__(computer_tool)
         self.element_finder = element_finder or ElementFinder()
+        self.test_runner = test_runner  # Reference to test runner for similarity matching
     
     async def execute(self, params: Dict[str, Any]) -> ToolResult:
         """Execute click action with configurable retry parameters"""
@@ -93,8 +94,36 @@ class ClickHandler(BaseActionHandler):
                     await asyncio.sleep(wait_time)
                 else:
                     print(f"[FIND_CLICK] ❌ Target '{target}' not found after {max_retries + 1} attempts")
+                    
+                    # Try similarity-based fallback as last resort
+                    if self.test_runner and hasattr(self.test_runner, '_find_similar_elements'):
+                        print(f"[FIND_CLICK] Attempting similarity-based fallback for '{target}'...")
+                        similar_coordinate = await self.test_runner._find_similar_elements(target, screenshot_result.base64_image)
+                        
+                        if similar_coordinate:
+                            print(f"[FIND_CLICK] ✅ Similarity fallback found target at {similar_coordinate}")
+                            
+                            # Move mouse and click on similar element
+                            print(f"[FIND_CLICK] Moving mouse to similar target at {similar_coordinate}")
+                            await self.computer_tool(action='mouse_move', coordinate=similar_coordinate)
+                            await asyncio.sleep(0.3)
+                            
+                            print(f"[FIND_CLICK] Clicking similar target at {similar_coordinate}")
+                            await self.computer_tool(action='left_click', coordinate=similar_coordinate)
+                            await asyncio.sleep(0.5)
+                            
+                            # Take final screenshot
+                            final_screenshot = await self.computer_tool(action='screenshot')
+                            
+                            return ToolResult(
+                                output=f"Found similar element to '{target}' and clicked at {similar_coordinate} (similarity fallback)",
+                                base64_image=final_screenshot.base64_image
+                            )
+                        else:
+                            print(f"[FIND_CLICK] ❌ Similarity fallback also failed")
+                    
                     return ToolResult(
-                        error=f"Could not find target '{target}' on screen using OCR or vision systems after {max_retries + 1} attempts.",
+                        error=f"Could not find target '{target}' on screen using OCR, vision systems, or similarity matching after {max_retries + 1} attempts.",
                         base64_image=screenshot_result.base64_image
                     )
                 

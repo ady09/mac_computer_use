@@ -184,9 +184,10 @@ class FileHandler(BaseActionHandler):
 class VerificationHandler(BaseActionHandler):
     """Handle verification actions"""
     
-    def __init__(self, computer_tool, element_finder: ElementFinder = None):
+    def __init__(self, computer_tool, element_finder: ElementFinder = None, test_runner=None):
         super().__init__(computer_tool)
         self.element_finder = element_finder or ElementFinder()
+        self.test_runner = test_runner  # Reference to test runner for similarity matching
     
     async def execute(self, params: Dict[str, Any]) -> ToolResult:
         """Default execute method - not used, use specific verification methods instead"""
@@ -219,8 +220,23 @@ class VerificationHandler(BaseActionHandler):
                     await asyncio.sleep(wait_time)
                 else:
                     print(f"[VERIFY_ELEMENT] ❌ Element '{element}' not found after {max_retries + 1} attempts")
+                    
+                    # Try similarity-based fallback as last resort
+                    if self.test_runner and hasattr(self.test_runner, '_find_similar_elements'):
+                        print(f"[VERIFY_ELEMENT] Attempting similarity-based fallback for '{element}'...")
+                        similar_coordinate = await self.test_runner._find_similar_elements(element, screenshot_result.base64_image)
+                        
+                        if similar_coordinate:
+                            print(f"[VERIFY_ELEMENT] ✅ Similarity fallback found element at {similar_coordinate}")
+                            return ToolResult(
+                                output=f"Element similar to '{element}' found and verified at {similar_coordinate} (similarity fallback)",
+                                base64_image=screenshot_result.base64_image
+                            )
+                        else:
+                            print(f"[VERIFY_ELEMENT] ❌ Similarity fallback also failed")
+                    
                     return ToolResult(
-                        error=f"Element '{element}' not found on screen after {max_retries + 1} attempts",
+                        error=f"Element '{element}' not found on screen after {max_retries + 1} attempts (including similarity matching)",
                         base64_image=screenshot_result.base64_image
                     )
                 
@@ -254,8 +270,23 @@ class VerificationHandler(BaseActionHandler):
                     await asyncio.sleep(wait_time)
                 else:
                     print(f"[VERIFY_TEXT] ❌ Text '{text}' not found after {max_retries + 1} attempts")
+                    
+                    # Try similarity-based fallback as last resort
+                    if self.test_runner and hasattr(self.test_runner, '_find_similar_elements'):
+                        print(f"[VERIFY_TEXT] Attempting similarity-based fallback for '{text}'...")
+                        similar_coordinate = await self.test_runner._find_similar_elements(text, screenshot_result.base64_image)
+                        
+                        if similar_coordinate:
+                            print(f"[VERIFY_TEXT] ✅ Similarity fallback found text at {similar_coordinate}")
+                            return ToolResult(
+                                output=f"Text similar to '{text}' found and verified at {similar_coordinate} (similarity fallback)",
+                                base64_image=screenshot_result.base64_image
+                            )
+                        else:
+                            print(f"[VERIFY_TEXT] ❌ Similarity fallback also failed")
+                    
                     return ToolResult(
-                        error=f"Text '{text}' not found on screen after {max_retries + 1} attempts",
+                        error=f"Text '{text}' not found on screen after {max_retries + 1} attempts (including similarity matching)",
                         base64_image=screenshot_result.base64_image
                     )
                 
