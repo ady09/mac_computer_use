@@ -22,6 +22,9 @@ class ActionType(str, Enum):
     CLOSE_APPLICATION = "close_application"
     FILE_UPLOAD = "file_upload"
     ENSURE_FILE_EXISTS = "ensure_file_exists"
+    ICON_CLICK = "icon_click"
+    ICON_FIND = "icon_find"
+    ICON_SAVE_TEMPLATE = "icon_save_template"
     CUSTOM = "custom"
 
 

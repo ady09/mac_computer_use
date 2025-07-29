@@ -16,6 +16,8 @@ from .actions import (
     VerificationHandler,
     CustomHandler
 )
+from .actions.icon_handler import IconHandler
+from .vision import IconDetector
 
 __all__ = [
     'OCREngine',
@@ -29,5 +31,7 @@ __all__ = [
     'ApplicationHandler',
     'FileHandler',
     'VerificationHandler',
-    'CustomHandler'
+    'CustomHandler',
+    'IconHandler',
+    'IconDetector'
 ]

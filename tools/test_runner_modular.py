@@ -27,7 +27,8 @@ from .test_automation import (
     ApplicationHandler,
     FileHandler,
     VerificationHandler,
-    CustomHandler
+    CustomHandler,
+    IconHandler
 )
 
 
@@ -89,6 +90,7 @@ class ModularTestRunner:
         self.app_handler = ApplicationHandler(self.computer_tool)
         self.file_handler = FileHandler(self.computer_tool)
         self.verification_handler = VerificationHandler(self.computer_tool, self.element_finder)
+        self.icon_handler = IconHandler(self.computer_tool, self)  # Pass self for similarity matching
         self.custom_handler = CustomHandler(self.computer_tool)
         
         # Action handlers mapping
@@ -104,6 +106,9 @@ class ModularTestRunner:
             ActionType.CLOSE_APPLICATION: self.app_handler.execute_close,
             ActionType.FILE_UPLOAD: self.file_handler.execute_upload,
             ActionType.ENSURE_FILE_EXISTS: self.file_handler.execute_ensure_exists,
+            ActionType.ICON_CLICK: self.icon_handler.execute,
+            ActionType.ICON_FIND: self.icon_handler.execute_find_only,
+            ActionType.ICON_SAVE_TEMPLATE: self.icon_handler.execute_save_template,
             ActionType.CUSTOM: self.custom_handler.execute
         }
 
@@ -260,7 +265,7 @@ class ModularTestRunner:
                 )
             
             # Track successful element interactions for similarity matching
-            if step.action in [ActionType.COMPUTER_CLICK, ActionType.VERIFY_ELEMENT, ActionType.VERIFY_TEXT]:
+            if step.action in [ActionType.COMPUTER_CLICK, ActionType.VERIFY_ELEMENT, ActionType.VERIFY_TEXT, ActionType.ICON_CLICK, ActionType.ICON_FIND]:
                 element_name = None
                 if step.action == ActionType.COMPUTER_CLICK:
                     element_name = step.params.get('target', '')
@@ -268,6 +273,8 @@ class ModularTestRunner:
                     element_name = step.params.get('element', '')
                 elif step.action == ActionType.VERIFY_TEXT:
                     element_name = step.params.get('text', '')
+                elif step.action in [ActionType.ICON_CLICK, ActionType.ICON_FIND]:
+                    element_name = step.params.get('icon', '')
                 
                 if element_name and result.base64_image:
                     # Extract coordinates if available in output
